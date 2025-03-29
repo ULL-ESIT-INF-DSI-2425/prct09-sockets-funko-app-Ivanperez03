@@ -1,0 +1,12 @@
+{
+  "id": 1,
+  "name": "Classic Sonic V2",
+  "description": "Updated version",
+  "type": "Pop!",
+  "genre": "Games",
+  "franchise": "Sonic",
+  "number": 22,
+  "exclusive": true,
+  "specialFeatures": "Super Glow",
+  "marketValue": 150
+}
