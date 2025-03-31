@@ -1,18 +1,48 @@
+import net from 'net';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import chalk from 'chalk';
-import { Funko, FunkoGenre, FunkoType } from './funkoElements.js';
-import { FunkoFunctions } from './funkoFunctions.js';
+import { RequestType } from '../CS_Primera/types.js';
+import { Funko, FunkoType, FunkoGenre } from '../structure/funkoElements.js';
 
-/**
- * Segun su valor de mercado, se imprime de un color u otro
- * @param funko - funko a imprimir la informacion
- */
+const client = net.connect({ port: 60300 });
+
+function sendRequest(request: RequestType) {
+  client.write(JSON.stringify(request) + '\n');
+}
+
+let wholeData = '';
+client.on('data', (data) => {
+  wholeData += data;
+
+  let messageLimit = wholeData.indexOf('\n');
+  while (messageLimit !== -1) {
+    const message = wholeData.substring(0, messageLimit);
+    wholeData = wholeData.substring(messageLimit + 1);
+    const response = JSON.parse(message);
+    if (response.success) {
+      console.log(chalk.green(`✅ ${response.message}`));
+      if (response.funkoPops) {
+        response.funkoPops.forEach((funko: Funko) => {
+          console.log(printFunko(funko));
+        });
+      }
+    } else {
+      console.log(chalk.red(`❌ ${response.message}`));
+    }
+    messageLimit = wholeData.indexOf('\n');
+  }
+});
+
+client.on('error', (err) => {
+  console.error(chalk.red('Error en el cliente:', err.message));
+});
+
 export function printFunko(funko: Funko) {
   let valueColor = chalk.red;
   if (funko.marketValue > 100) {
     valueColor = chalk.green;
-  } else if (funko.marketValue > 50) { 
+  } else if (funko.marketValue > 50) {
     valueColor = chalk.yellow;
   } else if (funko.marketValue > 20) {
     valueColor = chalk.blue;
@@ -34,9 +64,6 @@ export function printFunko(funko: Funko) {
   return output;
 }
 
-/**
- * Obtencion de parametros por consola y funcionalidades
- */
 yargs(hideBin(process.argv))
   .command('add', 'Add a funko', {
     user: { type: 'string', demandOption: true },
@@ -51,21 +78,45 @@ yargs(hideBin(process.argv))
     special: { type: 'string', demandOption: true },
     value: { type: 'number', demandOption: true },
   }, (args) => {
-    const funko = new Funko(
+    const funko: Funko = new Funko(
       args.id, args.name, args.desc,
       args.type as FunkoType, args.genre as FunkoGenre,
       args.franchise, args.number, args.exclusive,
       args.special, args.value
     );
+    const request: RequestType = { type: 'add', user: args.user, funkoPop: [funko] };
+    sendRequest(request);
+  })
 
-    const collection = new FunkoFunctions(args.user);
-    collection.addFunko(funko, (success) => {
-      if (success) {
-        console.log(chalk.green(`Funko añadido a la colección de ${args.user}`));
-      } else {
-        console.log(chalk.red(`Ya existe un Funko con ID ${args.id} en la colección de ${args.user}`));
-      }
-    });
+  .command('list', 'List all funkos of a user', {
+    user: { type: 'string', demandOption: true },
+  }, (args) => {
+    const request: RequestType = { type: 'list', user: args.user };
+    sendRequest(request);
+  })
+
+  .command('read', 'Read a funko', {
+    user: { type: 'string', demandOption: true },
+    id: { type: 'number', demandOption: true },
+  }, (args) => {
+    const request: RequestType = { 
+      type: 'read', 
+      user: args.user, 
+      funkoPop: [{ id: args.id, name: '', description: '', type: 'Pop!', genre: 'Videojuegos', franchise: '', number: 0, exclusive: false, specialFeatures: '', marketValue: 0 }] 
+    };
+    sendRequest(request);
+  })
+  
+  .command('remove', 'Remove a funko', {
+    user: { type: 'string', demandOption: true },
+    id: { type: 'number', demandOption: true },
+  }, (args) => {
+    const request: RequestType = { 
+      type: 'remove', 
+      user: args.user, 
+      funkoPop: [{ id: args.id, name: '', description: '', type: 'Pop!', genre: 'Videojuegos', franchise: '', number: 0, exclusive: false, specialFeatures: '', marketValue: 0 }] 
+    };
+    sendRequest(request);
   })
 
   .command('update', 'Update a funko', {
@@ -81,63 +132,14 @@ yargs(hideBin(process.argv))
     special: { type: 'string', demandOption: true },
     value: { type: 'number', demandOption: true },
   }, (args) => {
-    const funko = new Funko(
+    const funko: Funko = new Funko(
       args.id, args.name, args.desc,
       args.type as FunkoType, args.genre as FunkoGenre,
       args.franchise, args.number, args.exclusive,
       args.special, args.value
     );
-
-    const collection = new FunkoFunctions(args.user);
-    collection.updateFunko(funko, (success) => {
-      if (success) {
-        console.log(chalk.green(`Funko con ID ${args.id} actualizado`));
-      } else {
-        console.log(chalk.red(`No se encontró un Funko con ID ${args.id}`));
-      }
-    });
-  })
-
-  .command('remove', 'Remove a funko', {
-    user: { type: 'string', demandOption: true },
-    id: { type: 'number', demandOption: true },
-  }, (args) => {
-    const collection = new FunkoFunctions(args.user);
-    collection.removeFunko(args.id, (success) => {
-      if (success) {
-        console.log(chalk.green(`Funko con ID ${args.id} eliminado correctamente`));
-      } else {
-        console.log(chalk.red(`No se encontró un Funko con ID ${args.id}`));
-      }
-    });
-  })
-
-  .command('read', 'Read a funko', {
-    user: { type: 'string', demandOption: true },
-    id: { type: 'number', demandOption: true },
-  }, (args) => {
-    const collection = new FunkoFunctions(args.user);
-    collection.getFunko(args.id, (funko) => {
-      if (funko) {
-        console.log(printFunko(funko));
-      } else {
-        console.log(chalk.red(`No se encontró el Funko con ID ${args.id}`));
-      }
-    });
-  })
-
-  .command('list', 'List all funkos of a user', {
-    user: { type: 'string', demandOption: true },
-  }, (args) => {
-    const collection = new FunkoFunctions(args.user);
-    collection.listFunkos((funkos) => {
-      if (funkos.length === 0) {
-        console.log(chalk.red(`No se encontraron Funkos en la colección de ${args.user}`));
-      } else {
-        console.log(chalk.green(`Funkos de ${args.user}:`));
-        funkos.forEach(f => console.log(printFunko(f)));
-      }
-    });
+    const request: RequestType = { type: 'update', user: args.user, funkoPop: [funko] };
+    sendRequest(request);
   })
 
   .help()

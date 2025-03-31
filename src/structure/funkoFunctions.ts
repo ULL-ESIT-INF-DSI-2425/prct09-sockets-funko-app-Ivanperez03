@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { Funko } from './funkoElements.js';
+import { Funko } from '../structure/funkoElements.js';
 
 export class FunkoFunctions {
   /**
